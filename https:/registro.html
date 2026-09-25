@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Registro - SAUCEDO'S DETAILING</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: white;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 500px;
+      margin: auto;
+      padding: 25px 20px 40px;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #aaa;
+      margin-bottom: 30px;
+    }
+
+    label {
+      display: block;
+      margin-top: 18px;
+      margin-bottom: 7px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid #444;
+      background: #222;
+      color: white;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+
+    input[type="file"] {
+      padding: 10px;
+    }
+
+    button {
+      width: 100%;
+      padding: 17px;
+      margin-top: 28px;
+      border: none;
+      border-radius: 10px;
+      background: white;
+      color: #111;
+      font-size: 17px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+    }
+
+    #mensaje {
+      margin-top: 20px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .nota {
+      margin-top: 8px;
+      color: #888;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>SAUCEDO'S DETAILING</h1>
+
+  <div class="subtitle">
+    Registro de cliente
+  </div>
+
+  <form id="registroForm">
+
+    <label for="full_name">Nombre completo</label>
+    <input
+      type="text"
+      id="full_name"
+      required
+      placeholder="Ej. Juan Pérez"
+    >
+
+    <label for="phone">WhatsApp</label>
+    <input
+      type="tel"
+      id="phone"
+      required
+      placeholder="Ej. 6761234567"
+    >
+
+    <label for="vehicle_make">Marca del vehículo</label>
+    <input
+      type="text"
+      id="vehicle_make"
+      required
+      placeholder="Ej. Jeep"
+    >
+
+    <label for="vehicle_model">Modelo del vehículo</label>
+    <input
+      type="text"
+      id="vehicle_model"
+      required
+      placeholder="Ej. Grand Cherokee"
+    >
+
+    <label for="vehicle_color">Color del vehículo</label>
+    <input
+      type="text"
+      id="vehicle_color"
+      required
+      placeholder="Ej. Negro"
+    >
+
+    <label for="vehicle_photo">Foto del vehículo</label>
+    <input
+      type="file"
+      id="vehicle_photo"
+      accept="image/*"
+      capture="environment"
+      required
+    >
+
+    <div class="nota">
+      De preferencia toma una foto lateral o de 3/4 del vehículo.
+    </div>
+
+    <button type="submit" id="btnRegistrar">
+      Registrarme
+    </button>
+
+  </form>
+
+  <div id="mensaje"></div>
+
+</div>
+
+<script>
+
+  const supabaseClient = window.supabase.createClient(
+    window.SUPABASE_URL,
+    window.SUPABASE_ANON_KEY
+  );
+
+  const formulario = document.getElementById("registroForm");
+  const boton = document.getElementById("btnRegistrar");
+  const mensaje = document.getElementById("mensaje");
+
+  formulario.addEventListener("submit", async function(event) {
+
+    event.preventDefault();
+
+    boton.disabled = true;
+    boton.textContent = "Registrando...";
+
+    mensaje.textContent = "";
+
+    try {
+
+      const nombre = document.getElementById("full_name").value.trim();
+      const telefono = document.getElementById("phone").value.trim();
+      const marca = document.getElementById("vehicle_make").value.trim();
+      const modelo = document.getElementById("vehicle_model").value.trim();
+      const color = document.getElementById("vehicle_color").value.trim();
+
+      const archivo = document.getElementById("vehicle_photo").files[0];
+
+      if (!archivo) {
+        throw new Error("Selecciona una foto del vehículo.");
+      }
+
+      const extension = archivo.name.split(".").pop().toLowerCase();
+
+      const nombreArchivo =
+        crypto.randomUUID() + "." + extension;
+
+      const rutaFoto =
+        "vehiculos/" + nombreArchivo;
+
+      const { error: errorFoto } =
+        await supabaseClient
+          .storage
+          .from("vehicle-photos")
+          .upload(rutaFoto, archivo);
+
+      if (errorFoto) {
+        throw errorFoto;
+      }
+
+      const { data: fotoData } =
+        supabaseClient
+          .storage
+          .from("vehicle-photos")
+          .getPublicUrl(rutaFoto);
+
+      const fotoUrl = fotoData.publicUrl;
+
+      const { data, error } =
+        await supabaseClient
+          .from("customers")
+          .insert({
+            full_name: nombre,
+            phone: telefono,
+            vehicle_make: marca,
+            vehicle_model: modelo,
+            vehicle_color: color,
+            vehicle_photo_url: fotoUrl
+          })
+          .select()
+          .single();
+
+      if (error) {
+        throw error;
+      }
+
+      mensaje.innerHTML =
+        "✅ Registro realizado correctamente.<br><br>" +
+        "Tu información quedó registrada en SAUCEDO'S DETAILING.";
+
+      formulario.reset();
+
+    } catch (error) {
+
+      console.error(error);
+
+      mensaje.innerHTML =
+        "❌ No se pudo completar el registro.<br>" +
+        "Intenta nuevamente.";
+
+    }
+
+    boton.disabled = false;
+    boton.textContent = "Registrarme";
+
+  });
+
+</script>
+
+</body>
+</html>
